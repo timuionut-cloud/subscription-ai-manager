@@ -4,36 +4,66 @@
   <title>Subscription AI Manager</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
-<body style="font-family: Arial; padding: 20px;">
+
+<body style="font-family: Arial; padding: 20px; max-width: 700px;">
   <h1>Subscription Manager</h1>
-  <p>App-ul tău funcționează acum.</p>
 
   <button onclick="addSub()">Add Subscription</button>
 
+  <h3>Dashboard</h3>
+  <div id="stats"></div>
+
+  <h3>Subscriptions</h3>
   <ul id="list"></ul>
 
-  <script>
-    let subs = JSON.parse(localStorage.getItem("subs") || "[]");
+<script>
+let subs = JSON.parse(localStorage.getItem("subs") || "[]");
 
-    function render() {
-      const list = document.getElementById("list");
-      list.innerHTML = "";
-      subs.forEach(s => {
-        const li = document.createElement("li");
-        li.textContent = s.name + " - £" + s.price;
-        list.appendChild(li);
-      });
-    }
+function save() {
+  localStorage.setItem("subs", JSON.stringify(subs));
+}
 
-    function addSub() {
-      const name = prompt("Subscription name");
-      const price = prompt("Price GBP");
-      subs.push({ name, price });
-      localStorage.setItem("subs", JSON.stringify(subs));
-      render();
-    }
+function render() {
+  const list = document.getElementById("list");
+  const stats = document.getElementById("stats");
 
-    render();
-  </script>
+  list.innerHTML = "";
+
+  let monthly = 0;
+  let yearly = 0;
+
+  subs.forEach(s => {
+    const li = document.createElement("li");
+    li.innerHTML =
+      "<b>" + s.name + "</b> — £" + s.price +
+      " | " + s.cycle +
+      " | Next: " + s.date;
+
+    list.appendChild(li);
+
+    if (s.cycle === "monthly") monthly += Number(s.price);
+    if (s.cycle === "yearly") yearly += Number(s.price);
+  });
+
+  stats.innerHTML =
+    "Monthly cost: £" + monthly +
+    "<br>Yearly cost: £" + yearly;
+}
+
+function addSub() {
+  const name = prompt("Subscription name");
+  const price = prompt("Price GBP");
+  const cycle = prompt("Billing cycle (monthly/yearly)");
+  const date = prompt("Next renewal date (YYYY-MM-DD)");
+  const category = prompt("Category (optional)");
+
+  subs.push({ name, price, cycle, date, category });
+
+  save();
+  render();
+}
+
+render();
+</script>
 </body>
 </html>
