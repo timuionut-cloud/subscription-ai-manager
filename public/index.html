@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Subscription AI Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h1>Subscription Manager</h1>
+  <p>App-ul tău funcționează acum.</p>
+
+  <button onclick="addSub()">Add Subscription</button>
+
+  <ul id="list"></ul>
+
+  <script>
+    let subs = JSON.parse(localStorage.getItem("subs") || "[]");
+
+    function render() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+      subs.forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = s.name + " - £" + s.price;
+        list.appendChild(li);
+      });
+    }
+
+    function addSub() {
+      const name = prompt("Subscription name");
+      const price = prompt("Price GBP");
+      subs.push({ name, price });
+      localStorage.setItem("subs", JSON.stringify(subs));
+      render();
+    }
+
+    render();
+  </script>
+</body>
+</html>
