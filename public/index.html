@@ -1,69 +1,230 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Subscription AI Manager</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Subscription AI Manager</title>
+
+<style>
+body{
+  font-family: Arial;
+  background:#0f172a;
+  color:white;
+  padding:20px;
+}
+
+h1{
+  margin-bottom:5px;
+}
+
+.dashboard{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+.card{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+}
+
+.sub{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:10px;
+}
+
+button{
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  background:#38bdf8;
+  color:black;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+.delete{
+  background:#ef4444;
+  margin-left:10px;
+}
+
+canvas{
+  background:white;
+  border-radius:10px;
+  margin-top:15px;
+}
+</style>
 </head>
 
-<body style="font-family: Arial; padding: 20px; max-width: 700px;">
-  <h1>Subscription Manager</h1>
+<body>
 
-  <button onclick="addSub()">Add Subscription</button>
+<h1>Subscription Manager</h1>
+<p>Manage all your subscriptions</p>
 
-  <h3>Dashboard</h3>
-  <div id="stats"></div>
+<button onclick="addSub()">Add Subscription</button>
 
-  <h3>Subscriptions</h3>
-  <ul id="list"></ul>
+<h2>Dashboard</h2>
+
+<div class="dashboard">
+<div class="card">
+Monthly Total
+<div id="monthly"></div>
+</div>
+
+<div class="card">
+Yearly Total
+<div id="yearly"></div>
+</div>
+
+<div class="card">
+Active Subscriptions
+<div id="count"></div>
+</div>
+
+<div class="card">
+Next Renewal
+<div id="next"></div>
+</div>
+</div>
+
+<h2>Category Summary</h2>
+<div id="categories"></div>
+
+<h2>Subscriptions</h2>
+<div id="list"></div>
+
+<h2>Cost Chart</h2>
+<canvas id="chart" width="400" height="200"></canvas>
 
 <script>
+
 let subs = JSON.parse(localStorage.getItem("subs") || "[]");
 
-function save() {
-  localStorage.setItem("subs", JSON.stringify(subs));
+function save(){
+localStorage.setItem("subs", JSON.stringify(subs));
 }
 
-function render() {
-  const list = document.getElementById("list");
-  const stats = document.getElementById("stats");
-
-  list.innerHTML = "";
-
-  let monthly = 0;
-  let yearly = 0;
-
-  subs.forEach(s => {
-    const li = document.createElement("li");
-    li.innerHTML =
-      "<b>" + s.name + "</b> — £" + s.price +
-      " | " + s.cycle +
-      " | Next: " + s.date;
-
-    list.appendChild(li);
-
-    if (s.cycle === "monthly") monthly += Number(s.price);
-    if (s.cycle === "yearly") yearly += Number(s.price);
-  });
-
-  stats.innerHTML =
-    "Monthly cost: £" + monthly +
-    "<br>Yearly cost: £" + yearly;
+function deleteSub(i){
+subs.splice(i,1);
+save();
+render();
 }
 
-function addSub() {
-  const name = prompt("Subscription name");
-  const price = prompt("Price GBP");
-  const cycle = prompt("Billing cycle (monthly/yearly)");
-  const date = prompt("Next renewal date (YYYY-MM-DD)");
-  const category = prompt("Category (optional)");
+function addSub(){
+const name = prompt("Subscription name");
+const price = Number(prompt("Price GBP"));
+const cycle = prompt("Billing cycle (monthly/yearly)");
+const date = prompt("Next renewal date YYYY-MM-DD");
+const category = prompt("Category (TV, Tools, Trading etc)");
 
-  subs.push({ name, price, cycle, date, category });
-
-  save();
-  render();
+subs.push({name,price,cycle,date,category});
+save();
+render();
 }
+
+function render(){
+
+const list = document.getElementById("list");
+const cat = document.getElementById("categories");
+
+list.innerHTML="";
+cat.innerHTML="";
+
+let monthly=0;
+let yearly=0;
+let categories={};
+
+let nextDate=null;
+
+subs.forEach((s,i)=>{
+
+const div=document.createElement("div");
+div.className="sub";
+
+div.innerHTML=
+"<b>"+s.name+"</b><br>" +
+"£"+s.price+" | "+s.cycle+"<br>" +
+"Next: "+s.date+"<br>" +
+"Category: "+s.category +
+"<br><button class='delete' onclick='deleteSub("+i+")'>Remove</button>";
+
+list.appendChild(div);
+
+if(s.cycle==="monthly") monthly+=s.price;
+if(s.cycle==="yearly") yearly+=s.price;
+
+if(!categories[s.category]) categories[s.category]=0;
+categories[s.category]+=s.price;
+
+let d=new Date(s.date);
+if(!nextDate || d<nextDate) nextDate=d;
+
+});
+
+document.getElementById("monthly").innerText="£"+monthly;
+document.getElementById("yearly").innerText="£"+yearly;
+document.getElementById("count").innerText=subs.length;
+document.getElementById("next").innerText=nextDate?nextDate.toDateString():"-";
+
+for(let c in categories){
+const div=document.createElement("div");
+div.className="card";
+div.innerHTML=c+" total: £"+categories[c];
+cat.appendChild(div);
+}
+
+drawChart(categories);
+checkReminders();
+
+}
+
+function drawChart(categories){
+const ctx=document.getElementById("chart").getContext("2d");
+ctx.clearRect(0,0,400,200);
+
+let x=10;
+
+for(let c in categories){
+let h=categories[c]*2;
+ctx.fillRect(x,200-h,40,h);
+ctx.fillText(c,x,195);
+x+=60;
+}
+}
+
+function checkReminders(){
+const today=new Date();
+
+subs.forEach(s=>{
+let d=new Date(s.date);
+let diff=Math.floor((d-today)/(1000*60*60*24));
+
+if(diff===30){
+notify("Subscription renews in 30 days: "+s.name);
+}
+if(diff===7){
+notify("Subscription renews in 7 days: "+s.name);
+}
+if(diff===1){
+notify("Subscription renews tomorrow: "+s.name);
+}
+});
+}
+
+function notify(msg){
+if(Notification.permission==="granted"){
+new Notification(msg);
+}
+}
+
+Notification.requestPermission();
 
 render();
+
 </script>
+
 </body>
 </html>
