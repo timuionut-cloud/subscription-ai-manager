@@ -2,12 +2,11 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Subscription Finance Dashboard</title>
+<title>Subscription Finance Manager</title>
 
 <style>
-
 body{
-font-family: Inter, Arial;
+font-family:Arial;
 background:#0b1220;
 color:white;
 padding:20px;
@@ -15,43 +14,31 @@ max-width:1100px;
 margin:auto;
 }
 
-h1{
-margin-bottom:5px;
-}
-
-.topbar{
-display:flex;
-gap:10px;
-margin-bottom:20px;
-flex-wrap:wrap;
+.card{
+background:#111827;
+padding:15px;
+border-radius:12px;
+margin-bottom:10px;
 }
 
 button{
-padding:10px 14px;
+padding:8px 12px;
 border:none;
-border-radius:10px;
+border-radius:8px;
 background:#3b82f6;
 color:white;
 cursor:pointer;
+margin-top:5px;
 }
 
-input,select{
-padding:8px;
-border-radius:8px;
-border:none;
-}
+.delete{background:#ef4444}
+.paid{background:#22c55e}
 
 .dashboard{
 display:grid;
 grid-template-columns:repeat(4,1fr);
 gap:10px;
 margin-bottom:20px;
-}
-
-.card{
-background:#111827;
-padding:15px;
-border-radius:12px;
 }
 
 .sub{
@@ -61,58 +48,41 @@ border-radius:12px;
 margin-bottom:10px;
 }
 
-.delete{
-background:#ef4444;
-margin-top:5px;
-}
-
-.calendar{
-background:#111827;
-padding:15px;
-border-radius:12px;
-margin-top:15px;
-}
-
-canvas{
-background:white;
-border-radius:12px;
-margin-top:10px;
-}
-
 </style>
 </head>
 
 <body>
 
-<h1>Subscription Finance Dashboard</h1>
+<h1>Subscription Finance Manager</h1>
 
-<div class="topbar">
+<button onclick="addBudget()">Add Budget Source</button>
 <button onclick="addSub()">Add Subscription</button>
 
-<select id="filterCategory" onchange="render()">
-<option value="all">All categories</option>
+<br><br>
+
+<select id="categoryFilter" onchange="render()">
+<option value="all">All Categories</option>
 </select>
 
-<input type="month" id="filterMonth" onchange="render()" />
+<input type="month" id="monthFilter" onchange="render()" />
 
-<input type="number" id="budgetInput" placeholder="Monthly budget £" onchange="setBudget()" />
-</div>
+<h2>Dashboard</h2>
 
 <div class="dashboard">
 
 <div class="card">
-Monthly Spend
+Total Income
+<div id="income"></div>
+</div>
+
+<div class="card">
+Monthly Subscriptions
 <div id="monthly"></div>
 </div>
 
 <div class="card">
-Budget Remaining
-<div id="budget"></div>
-</div>
-
-<div class="card">
-Subscriptions
-<div id="count"></div>
+Remaining Budget
+<div id="remaining"></div>
 </div>
 
 <div class="card">
@@ -122,38 +92,58 @@ Next Payment
 
 </div>
 
+<h2>Next Payments</h2>
+<div id="nextPayments"></div>
+
 <h2>Subscriptions</h2>
 <div id="list"></div>
-
-<h2>Category Analytics</h2>
-<canvas id="chart" width="600" height="250"></canvas>
-
-<h2>Renewal Calendar</h2>
-<div id="calendar" class="calendar"></div>
 
 <script>
 
 let subs = JSON.parse(localStorage.getItem("subs") || "[]");
-let budget = localStorage.getItem("budget") || 0;
+let budgets = JSON.parse(localStorage.getItem("budgets") || "[]");
 
 function save(){
 localStorage.setItem("subs", JSON.stringify(subs));
+localStorage.setItem("budgets", JSON.stringify(budgets));
 }
 
-function setBudget(){
-budget = Number(document.getElementById("budgetInput").value);
-localStorage.setItem("budget", budget);
+function addBudget(){
+const name = prompt("Budget name (Salary, Business etc)");
+const amount = Number(prompt("Monthly income amount"));
+
+budgets.push({name,amount});
+save();
 render();
 }
 
 function addSub(){
 
+if(budgets.length===0){
+alert("Add a budget first");
+return;
+}
+
 const name = prompt("Subscription name");
 const price = Number(prompt("Price GBP"));
 const category = prompt("Category");
-const payDay = Number(prompt("Payment day each month (1-28)"));
+const payDay = Number(prompt("Payment day (1-28)"));
 
-subs.push({name,price,category,payDay});
+let budgetNames = budgets.map(b=>b.name).join(", ");
+const budget = prompt("Which budget? ("+budgetNames+")");
+
+subs.push({name,price,category,payDay,budget});
+save();
+render();
+}
+
+function markPaid(i){
+
+let sub=subs[i];
+let today=new Date();
+today.setMonth(today.getMonth()+1);
+
+subs[i].payDay=sub.payDay;
 
 save();
 render();
@@ -167,102 +157,88 @@ render();
 
 function render(){
 
-let monthly=0;
-let categories={};
+let catFilter=document.getElementById("categoryFilter").value;
+let month=document.getElementById("monthFilter").value;
+
 let list=document.getElementById("list");
-let cal=document.getElementById("calendar");
+let nextPayments=document.getElementById("nextPayments");
 
 list.innerHTML="";
-cal.innerHTML="";
+nextPayments.innerHTML="";
 
-let filterCat=document.getElementById("filterCategory").value;
-let monthFilter=document.getElementById("filterMonth").value;
+let income=0;
+budgets.forEach(b=>income+=b.amount);
+
+let monthly=0;
+
+let categories=new Set();
 
 subs.forEach((s,i)=>{
 
-if(filterCat!=="all" && s.category!==filterCat) return;
+categories.add(s.category);
+
+if(catFilter!=="all" && s.category!==catFilter) return;
 
 monthly+=s.price;
 
-if(!categories[s.category]) categories[s.category]=0;
-categories[s.category]+=s.price;
-
-const div=document.createElement("div");
+let div=document.createElement("div");
 div.className="sub";
 
 div.innerHTML=
 "<b>"+s.name+"</b><br>" +
-"£"+s.price+" monthly<br>" +
+"£"+s.price+"<br>" +
 "Category: "+s.category+"<br>" +
+"Budget: "+s.budget+"<br>" +
 "Pay day: "+s.payDay+
+"<br><button class='paid' onclick='markPaid("+i+")'>Mark Paid</button>"+
 "<br><button class='delete' onclick='deleteSub("+i+")'>Remove</button>";
 
 list.appendChild(div);
 
 });
 
-document.getElementById("monthly").innerText="£"+monthly;
-document.getElementById("count").innerText=subs.length;
-
-let remaining = budget - monthly;
-document.getElementById("budget").innerText="£"+remaining;
-
-populateCategories(categories);
-drawChart(categories);
-buildCalendar();
-
-}
-
-function populateCategories(categories){
-
-let select=document.getElementById("filterCategory");
-
-select.innerHTML="<option value='all'>All categories</option>";
-
-for(let c in categories){
+let select=document.getElementById("categoryFilter");
+select.innerHTML="<option value='all'>All Categories</option>";
+categories.forEach(c=>{
 let opt=document.createElement("option");
 opt.value=c;
 opt.textContent=c;
 select.appendChild(opt);
-}
+});
+
+let remaining=income-monthly;
+
+document.getElementById("income").innerText="£"+income;
+document.getElementById("monthly").innerText="£"+monthly;
+document.getElementById("remaining").innerText="£"+remaining;
+
+buildNextPayments();
 
 }
 
-function drawChart(categories){
+function buildNextPayments(){
 
-const ctx=document.getElementById("chart").getContext("2d");
-ctx.clearRect(0,0,600,250);
+let container=document.getElementById("nextPayments");
 
-let max = Math.max(...Object.values(categories), 10);
-let x=40;
+let today=new Date();
+let list=subs.map(s=>{
+let d=new Date();
+d.setDate(s.payDay);
+return {...s,date:d};
+});
 
-for(let c in categories){
+list.sort((a,b)=>a.date-b.date);
 
-let value=categories[c];
-let h=(value/max)*180;
-
-ctx.fillStyle="#3b82f6";
-ctx.fillRect(x,220-h,40,h);
-
-ctx.fillStyle="black";
-ctx.fillText(c,x,235);
-
-ctx.fillStyle="black";
-ctx.fillText("£"+value,x,210-h);
-
-x+=80;
-}
-
-}
-
-function buildCalendar(){
-
-let cal=document.getElementById("calendar");
-
-subs.forEach(s=>{
+list.slice(0,5).forEach(p=>{
 let div=document.createElement("div");
-div.textContent = s.name + " — day " + s.payDay;
-cal.appendChild(div);
+div.className="card";
+
+div.innerHTML=
+p.name+" — £"+p.price+
+"<br>Date: "+p.date.toDateString()+
+"<br>Budget: "+p.budget;
+
+container.appendChild(div);
 });
 
 }
