@@ -2,109 +2,161 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Subscription AI Manager</title>
+<title>Subscription Finance Dashboard</title>
 
 <style>
+
 body{
-  font-family: Arial;
-  background:#0f172a;
-  color:white;
-  padding:20px;
+font-family: Inter, Arial;
+background:#0b1220;
+color:white;
+padding:20px;
+max-width:1100px;
+margin:auto;
 }
 
 h1{
-  margin-bottom:5px;
+margin-bottom:5px;
 }
 
-.dashboard{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-bottom:20px;
-}
-
-.card{
-  background:#1e293b;
-  padding:15px;
-  border-radius:10px;
-}
-
-.sub{
-  background:#1e293b;
-  padding:15px;
-  border-radius:10px;
-  margin-bottom:10px;
+.topbar{
+display:flex;
+gap:10px;
+margin-bottom:20px;
+flex-wrap:wrap;
 }
 
 button{
-  padding:10px;
-  border:none;
-  border-radius:8px;
-  background:#38bdf8;
-  color:black;
-  font-weight:bold;
-  cursor:pointer;
+padding:10px 14px;
+border:none;
+border-radius:10px;
+background:#3b82f6;
+color:white;
+cursor:pointer;
+}
+
+input,select{
+padding:8px;
+border-radius:8px;
+border:none;
+}
+
+.dashboard{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:10px;
+margin-bottom:20px;
+}
+
+.card{
+background:#111827;
+padding:15px;
+border-radius:12px;
+}
+
+.sub{
+background:#111827;
+padding:15px;
+border-radius:12px;
+margin-bottom:10px;
 }
 
 .delete{
-  background:#ef4444;
-  margin-left:10px;
+background:#ef4444;
+margin-top:5px;
+}
+
+.calendar{
+background:#111827;
+padding:15px;
+border-radius:12px;
+margin-top:15px;
 }
 
 canvas{
-  background:white;
-  border-radius:10px;
-  margin-top:15px;
+background:white;
+border-radius:12px;
+margin-top:10px;
 }
+
 </style>
 </head>
 
 <body>
 
-<h1>Subscription Manager</h1>
-<p>Manage all your subscriptions</p>
+<h1>Subscription Finance Dashboard</h1>
 
+<div class="topbar">
 <button onclick="addSub()">Add Subscription</button>
 
-<h2>Dashboard</h2>
+<select id="filterCategory" onchange="render()">
+<option value="all">All categories</option>
+</select>
+
+<input type="month" id="filterMonth" onchange="render()" />
+
+<input type="number" id="budgetInput" placeholder="Monthly budget £" onchange="setBudget()" />
+</div>
 
 <div class="dashboard">
+
 <div class="card">
-Monthly Total
+Monthly Spend
 <div id="monthly"></div>
 </div>
 
 <div class="card">
-Yearly Total
-<div id="yearly"></div>
+Budget Remaining
+<div id="budget"></div>
 </div>
 
 <div class="card">
-Active Subscriptions
+Subscriptions
 <div id="count"></div>
 </div>
 
 <div class="card">
-Next Renewal
+Next Payment
 <div id="next"></div>
 </div>
-</div>
 
-<h2>Category Summary</h2>
-<div id="categories"></div>
+</div>
 
 <h2>Subscriptions</h2>
 <div id="list"></div>
 
-<h2>Cost Chart</h2>
-<canvas id="chart" width="400" height="200"></canvas>
+<h2>Category Analytics</h2>
+<canvas id="chart" width="600" height="250"></canvas>
+
+<h2>Renewal Calendar</h2>
+<div id="calendar" class="calendar"></div>
 
 <script>
 
 let subs = JSON.parse(localStorage.getItem("subs") || "[]");
+let budget = localStorage.getItem("budget") || 0;
 
 function save(){
 localStorage.setItem("subs", JSON.stringify(subs));
+}
+
+function setBudget(){
+budget = Number(document.getElementById("budgetInput").value);
+localStorage.setItem("budget", budget);
+render();
+}
+
+function addSub(){
+
+const name = prompt("Subscription name");
+const price = Number(prompt("Price GBP"));
+const category = prompt("Category");
+const payDay = Number(prompt("Payment day each month (1-28)"));
+
+subs.push({name,price,category,payDay});
+
+save();
+render();
 }
 
 function deleteSub(i){
@@ -113,114 +165,107 @@ save();
 render();
 }
 
-function addSub(){
-const name = prompt("Subscription name");
-const price = Number(prompt("Price GBP"));
-const cycle = prompt("Billing cycle (monthly/yearly)");
-const date = prompt("Next renewal date YYYY-MM-DD");
-const category = prompt("Category (TV, Tools, Trading etc)");
-
-subs.push({name,price,cycle,date,category});
-save();
-render();
-}
-
 function render(){
 
-const list = document.getElementById("list");
-const cat = document.getElementById("categories");
+let monthly=0;
+let categories={};
+let list=document.getElementById("list");
+let cal=document.getElementById("calendar");
 
 list.innerHTML="";
-cat.innerHTML="";
+cal.innerHTML="";
 
-let monthly=0;
-let yearly=0;
-let categories={};
-
-let nextDate=null;
+let filterCat=document.getElementById("filterCategory").value;
+let monthFilter=document.getElementById("filterMonth").value;
 
 subs.forEach((s,i)=>{
+
+if(filterCat!=="all" && s.category!==filterCat) return;
+
+monthly+=s.price;
+
+if(!categories[s.category]) categories[s.category]=0;
+categories[s.category]+=s.price;
 
 const div=document.createElement("div");
 div.className="sub";
 
 div.innerHTML=
 "<b>"+s.name+"</b><br>" +
-"£"+s.price+" | "+s.cycle+"<br>" +
-"Next: "+s.date+"<br>" +
-"Category: "+s.category +
+"£"+s.price+" monthly<br>" +
+"Category: "+s.category+"<br>" +
+"Pay day: "+s.payDay+
 "<br><button class='delete' onclick='deleteSub("+i+")'>Remove</button>";
 
 list.appendChild(div);
 
-if(s.cycle==="monthly") monthly+=s.price;
-if(s.cycle==="yearly") yearly+=s.price;
-
-if(!categories[s.category]) categories[s.category]=0;
-categories[s.category]+=s.price;
-
-let d=new Date(s.date);
-if(!nextDate || d<nextDate) nextDate=d;
-
 });
 
 document.getElementById("monthly").innerText="£"+monthly;
-document.getElementById("yearly").innerText="£"+yearly;
 document.getElementById("count").innerText=subs.length;
-document.getElementById("next").innerText=nextDate?nextDate.toDateString():"-";
 
-for(let c in categories){
-const div=document.createElement("div");
-div.className="card";
-div.innerHTML=c+" total: £"+categories[c];
-cat.appendChild(div);
+let remaining = budget - monthly;
+document.getElementById("budget").innerText="£"+remaining;
+
+populateCategories(categories);
+drawChart(categories);
+buildCalendar();
+
 }
 
-drawChart(categories);
-checkReminders();
+function populateCategories(categories){
+
+let select=document.getElementById("filterCategory");
+
+select.innerHTML="<option value='all'>All categories</option>";
+
+for(let c in categories){
+let opt=document.createElement("option");
+opt.value=c;
+opt.textContent=c;
+select.appendChild(opt);
+}
 
 }
 
 function drawChart(categories){
-const ctx=document.getElementById("chart").getContext("2d");
-ctx.clearRect(0,0,400,200);
 
-let x=10;
+const ctx=document.getElementById("chart").getContext("2d");
+ctx.clearRect(0,0,600,250);
+
+let max = Math.max(...Object.values(categories), 10);
+let x=40;
 
 for(let c in categories){
-let h=categories[c]*2;
-ctx.fillRect(x,200-h,40,h);
-ctx.fillText(c,x,195);
-x+=60;
-}
+
+let value=categories[c];
+let h=(value/max)*180;
+
+ctx.fillStyle="#3b82f6";
+ctx.fillRect(x,220-h,40,h);
+
+ctx.fillStyle="black";
+ctx.fillText(c,x,235);
+
+ctx.fillStyle="black";
+ctx.fillText("£"+value,x,210-h);
+
+x+=80;
 }
 
-function checkReminders(){
-const today=new Date();
+}
+
+function buildCalendar(){
+
+let cal=document.getElementById("calendar");
 
 subs.forEach(s=>{
-let d=new Date(s.date);
-let diff=Math.floor((d-today)/(1000*60*60*24));
-
-if(diff===30){
-notify("Subscription renews in 30 days: "+s.name);
-}
-if(diff===7){
-notify("Subscription renews in 7 days: "+s.name);
-}
-if(diff===1){
-notify("Subscription renews tomorrow: "+s.name);
-}
+let div=document.createElement("div");
+div.textContent = s.name + " — day " + s.payDay;
+cal.appendChild(div);
 });
-}
 
-function notify(msg){
-if(Notification.permission==="granted"){
-new Notification(msg);
 }
-}
-
-Notification.requestPermission();
 
 render();
 
